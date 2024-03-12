@@ -63,7 +63,7 @@
 <html lang="en">
 
 <head>
-	<title>15 three.js ar - hit test</title>
+	<title>16 three.js ar - hit test</title>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 	<link type="text/css" rel="stylesheet" href="main.css">
@@ -82,6 +82,9 @@
 	<!-- <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script> -->
 
 
+    <!-- HTMLのbody内でJavaScriptファイルを読み込む -->
+    <script src="Touch.js"></script>
+
 
 	<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
 
@@ -95,8 +98,7 @@
 					"three": "https://unpkg.com/three/build/three.module.js"
 				}
 			}
-		</script>
-
+	</script>
 
 	<script type="module">
 
@@ -182,17 +184,9 @@
 			container.appendChild(button);
 
 
-
-
-
-
-
-
-
 			// ARカメラ起動ボタン
 			document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
-			//
 
 			const geometry = new THREE.CylinderGeometry(0.1, 0.1, 0.2, 32).translate(0, 0.1, 0);
 
@@ -353,11 +347,11 @@
 				if (ARButton.model1_display === 0) {
 					controller.removeEventListener('select', loadModel1);
 					// toggleButton.textContent = 'ボタン (無効)';
-					console.log('確認 0');
+					// console.log('確認 0');
 				} else {
 					controller.addEventListener('select', loadModel1);
 					// toggleButton.textContent = 'ボタン (有効)';
-					console.log('確認 1');
+					// console.log('確認 1');
 				}
 			}
 
@@ -376,11 +370,11 @@
 				if (ARButton.model2_display === 0) {
 					controller.removeEventListener('select', loadModel2);
 					// toggleButton.textContent = 'ボタン (無効)';
-					console.log('確認 0');
+					// console.log('確認 0');
 				} else {
 					controller.addEventListener('select', loadModel2);
 					// toggleButton.textContent = 'ボタン (有効)';
-					console.log('確認 1');
+					// console.log('確認 1');
 				}
 			}
 
