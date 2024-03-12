@@ -49,9 +49,7 @@ class ARButton {
 				svg.style.right = '20px';
 				svg.style.top = '20px';
 				svg.addEventListener('click', function () {
-
 					currentSession.end();
-
 				});
 				overlay.appendChild(svg);
 
@@ -250,6 +248,7 @@ class ARButton {
 
 			};
 
+			// ボタンクリック時の処理
 			button.onclick = function () {
 
 				if (currentSession === null) {
@@ -263,6 +262,7 @@ class ARButton {
 				}
 
 			};
+
 
 
 
