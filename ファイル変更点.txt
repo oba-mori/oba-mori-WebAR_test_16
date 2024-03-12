@@ -1,0 +1,9 @@
+GLTFLoader.jsの
+// import { toTrianglesDrawMode } from '../utils/BufferGeometryUtils.js';
+を
+import { toTrianglesDrawMode } from './BufferGeometryUtils.js';
+に変更
+
+BufferGeometryUtils.js
+は同階層にあるため
+

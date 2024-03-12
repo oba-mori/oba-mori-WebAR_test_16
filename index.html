@@ -1,0 +1,492 @@
+<!-- 
+	WebAR_test_16
+
+	
+	
+
+	ソースコードを参考にGLTF形式の3Dモデルを取り込み表示
+	hittest
+	平面を検知して、画面をタップした時に、サークルの位置に3Dモデルが表示される
+	タップしたら表示され、前の物は消える → 移動しているように見せる
+
+	r11:複数種類の3Dモデルを表示(ボタンで切換)
+			(smallはタップした分生成、mediumはタップするごとに移動)
+
+	切替ボタンがARカメラの映像で隠れてしまう、映像の上に重ねたい
+
+
+	r12:
+	13:モデル二つの表示非表示をそれぞれボタンで制御
+	14:モデルの明るさ変更(モデル2のみ)
+	15:overlay1の高さがタッチの前後で変化してしまうため修正
+	16:
+
+
+
+	main.cssコメントアウト
+
+	ソースコード
+	https://github.com/mrdoob/three.js/blob/master/examples/jsm/webxr/ARButton.js
+	
+
+
+	・複数の3Dモデルを表示する場合
+	3Dファイルを用意します。
+	loadModel()関数を複製し、新しい関数を作成します。例えば、loadModel2()という関数を作成します。
+	複製した関数内のloader.load()メソッドの第1引数に、新しい3Dファイルのパスを指定します。
+	複製した関数内のscene.add()メソッドの引数に、新しいモデルを追加します。
+	新しい関数を呼び出すためのイベントリスナーを設定します。例えば、controller.addEventListener('select', loadModel2);というようにします。
+
+
+	
+-->
+
+
+
+<!-- 
+	WebAR_test_9
+
+	ソースコードを参考にGLTF形式の3Dモデルを取り込み表示
+	hittest
+	平面を検知して、画面をタップした時に、サークルの位置に3Dモデルが表示される
+	タップしたら表示され、前の物は消える → 移動しているように見せる
+
+	ソースコード
+	https://github.com/mrdoob/three.js/blob/master/examples/jsm/webxr/ARButton.js
+	
+-->
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<title>15 three.js ar - hit test</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+	<link type="text/css" rel="stylesheet" href="main.css">
+</head>
+
+<body>
+
+
+	<!-- 不要 -->
+	<!-- <div id="info">
+			<a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> ar - hit test<br/>(Chrome Android 81+)
+		</div>
+ -->
+	<!-- Import maps polyfill -->
+	<!-- Remove this when import maps will be widely supported -->
+	<!-- <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script> -->
+
+
+
+	<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+
+
+
+
+	<!--  importmapと一緒に使用し、three.module.jsをimportするため -->
+	<script type="importmap">
+			{
+				"imports": {
+					"three": "https://unpkg.com/three/build/three.module.js"
+				}
+			}
+		</script>
+
+
+	<script type="module">
+
+		// importmapと一緒に使用し、three.module.jsをimportするため
+		import * as THREE from 'three';
+		// 上記と同じ内容
+		// import * as THREE from "https://unpkg.com/three/build/three.module.js";
+
+
+
+		// import * as THREE from './three.module.js';  // ファイルパスを正確に指定する
+
+		// GLTFファイル使用用
+		import { GLTFLoader } from './GLTFLoader.js';
+
+		// import { ARButton } from 'three/addons/webxr/ARButton.js';
+		import { ARButton } from './ARButton.js';
+
+
+
+
+
+		let container;
+		let camera, scene, renderer;
+		let controller;
+
+		let reticle;
+
+		let hitTestSource = null;
+		let hitTestSourceRequested = false;
+
+
+
+		// ARButton クラスのインスタンスを作成
+		// const arButton = new ARButton();
+		let arButton;
+
+		arButton = new ARButton();
+
+
+
+		// 関数読み込み
+		init();
+		animate();
+
+
+		function init() {
+			
+			container = document.createElement('div');
+			document.body.appendChild(container);
+
+			scene = new THREE.Scene();
+
+			camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+			const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+			light.position.set(0.5, 1, 0.25);
+			scene.add(light);
+
+			//
+			renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			renderer.xr.enabled = true;
+			container.appendChild(renderer.domElement);
+
+
+
+
+
+
+
+
+			// ボタンの作成と追加
+			const button = document.createElement('button');
+			button.id = 'toggleButton';
+			button.style.position = 'absolute';
+			button.style.top = '50%';
+			button.style.left = '50%';
+			button.style.transform = 'translate(-50%, -50%)';
+			button.style.zIndex = '9999';
+			button.textContent = 'ボタン (有効)';
+			container.appendChild(button);
+
+
+
+
+
+
+
+
+
+			// ARカメラ起動ボタン
+			document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+
+			//
+
+			const geometry = new THREE.CylinderGeometry(0.1, 0.1, 0.2, 32).translate(0, 0.1, 0);
+
+			// 不要
+			// コード内で3Dモデルを作成
+			function onSelect() {
+
+				if (reticle.visible) {
+
+					// 必要ないのでコメントアウト
+					const material = new THREE.MeshPhongMaterial({ color: 0xffffff * Math.random() });
+					const mesh = new THREE.Mesh(geometry, material);
+					reticle.matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
+					mesh.scale.y = Math.random() * 2 + 1;
+					scene.add(mesh);
+
+				}
+
+			}
+
+
+
+
+			// 3Dモデル1
+			// 下で使用するため
+			let currentModel1 = null; // currentModel1 変数を定義
+
+			// 新しく3Dモデルを表示する際、表示済みの3Dモデルを消す
+			function loadModel1() {
+				if (currentModel1) scene.remove(currentModel1); // 既存のモデルを削除
+
+				const loader = new GLTFLoader();
+
+				loader.load(
+					'cube_small.glb',
+					function (gltf) {
+						const model = gltf.scene;
+						const position = new THREE.Vector3();
+						const quaternion = new THREE.Quaternion();
+						const scale = new THREE.Vector3();
+
+
+						// 3Dモデルの明るさ設定
+						// マテリアル用の変数
+						const materials = model.children[0].material;
+						// マテリアルの明るさを調整
+						materials.emissive = new THREE.Color(0.5, 0.5, 0.5); // 発光を白に設定
+						// モデルに調整したマテリアルを適用
+						model.children[0].material = materials;
+
+
+						reticle.matrix.decompose(position, quaternion, scale);
+						model.position.copy(position);
+						model.quaternion.copy(quaternion);
+						model.scale.copy(scale);
+						// シーンにモデルを追加
+						scene.add(model);
+
+						currentModel1 = model; // 新しいモデルを保持
+					},
+					function (xhr) {
+						console.log((xhr.loaded / xhr.total) * 100 + '% loaded');
+					},
+					function (error) {
+						console.error('An error happened', error);
+					}
+				);
+			}
+
+
+
+
+			// 3Dモデル2
+			// 下で使用するため
+			let currentModel2 = null; // currentModel2 変数を定義
+
+
+
+			// 新しく3Dモデルを表示するため、表示済みの3Dモデルを消す
+			function removeMode2() {
+				return new Promise(resolve => {
+					if (currentModel1) {
+						scene.remove(currentModel2); // 古いモデルを削除
+						currentModel2 = null;
+					}
+					resolve();
+				});
+			}
+
+
+
+			// 新しく3Dモデルを表示する
+			function loadModel2() {
+				// if (currentModel2) scene.remove(currentModel2); // 既存のモデルを削除
+
+				const loader = new GLTFLoader();
+
+				loader.load(
+					'cube_medium.glb',
+					function (gltf) {
+						const model = gltf.scene;
+						const position = new THREE.Vector3();
+						const quaternion = new THREE.Quaternion();
+						const scale = new THREE.Vector3();
+
+
+						// 3Dモデルの明るさ設定
+						// マテリアル用の変数
+						const materials = model.children[0].material;
+						// マテリアルの明るさを調整
+						materials.emissive = new THREE.Color(0.5, 0.5, 0.5); // 発光を白に設定
+						// モデルに調整したマテリアルを適用
+						model.children[0].material = materials;
+
+
+						reticle.matrix.decompose(position, quaternion, scale);
+						model.position.copy(position);
+						model.quaternion.copy(quaternion);
+						model.scale.copy(scale);
+						// シーンにモデルを追加
+						scene.add(model);
+
+						currentModel2 = model; // 新しいモデルを保持
+					},
+					function (xhr) {
+						console.log((xhr.loaded / xhr.total) * 100 + '% loaded');
+					},
+					function (error) {
+						console.error('An error happened', error);
+					}
+				);
+			}
+
+
+
+
+
+
+			controller = renderer.xr.getController(0);
+			// // コード内で作成した3Dモデルを表示
+			// controller.addEventListener( 'select', onSelect );
+			// コード内で作成した3Dモデルを表示
+
+
+
+
+			// モデル1
+			controller.addEventListener('select', loadModel1);
+			// モデル2
+			controller.addEventListener('select', removeMode2);	//古いモデルを消す
+			controller.addEventListener('select', loadModel2);	//新しいモデルを表示
+
+
+
+			// モデル1
+			// カスタムイベントを受け取って条件を再評価する
+			function model1_event_fun() {
+				if (ARButton.model1_display === 0) {
+					controller.removeEventListener('select', loadModel1);
+					// toggleButton.textContent = 'ボタン (無効)';
+					console.log('確認 0');
+				} else {
+					controller.addEventListener('select', loadModel1);
+					// toggleButton.textContent = 'ボタン (有効)';
+					console.log('確認 1');
+				}
+			}
+
+			// カスタムイベントを監視して、ARButton.model1_display の値に応じて条件を再評価する
+			document.addEventListener('m1_event', model1_event_fun);
+
+
+
+
+
+
+
+			// モデル2
+			// カスタムイベントを受け取って条件を再評価する
+			function handleARButtonQChangedEvent() {
+				if (ARButton.model2_display === 0) {
+					controller.removeEventListener('select', loadModel2);
+					// toggleButton.textContent = 'ボタン (無効)';
+					console.log('確認 0');
+				} else {
+					controller.addEventListener('select', loadModel2);
+					// toggleButton.textContent = 'ボタン (有効)';
+					console.log('確認 1');
+				}
+			}
+
+			// カスタムイベントを監視して、ARButton.model2_display の値に応じて条件を再評価する
+			document.addEventListener('arButtonQChanged', handleARButtonQChangedEvent);
+
+
+
+
+
+
+
+			scene.add(controller);
+
+			reticle = new THREE.Mesh(
+				new THREE.RingGeometry(0.15, 0.2, 32).rotateX(- Math.PI / 2),
+				new THREE.MeshBasicMaterial()
+			);
+			reticle.matrixAutoUpdate = false;
+			reticle.visible = false;
+			scene.add(reticle);
+
+			//
+			window.addEventListener('resize', onWindowResize);
+
+		}
+
+
+
+
+
+
+
+		function onWindowResize() {
+
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+
+			renderer.setSize(window.innerWidth, window.innerHeight);
+
+		}
+
+		//
+
+		function animate() {
+
+			renderer.setAnimationLoop(render);
+
+		}
+
+		function render(timestamp, frame) {
+
+			if (frame) {
+
+				const referenceSpace = renderer.xr.getReferenceSpace();
+				const session = renderer.xr.getSession();
+
+				if (hitTestSourceRequested === false) {
+
+					session.requestReferenceSpace('viewer').then(function (referenceSpace) {
+
+						session.requestHitTestSource({ space: referenceSpace }).then(function (source) {
+
+							hitTestSource = source;
+
+						});
+
+					});
+
+					session.addEventListener('end', function () {
+
+						hitTestSourceRequested = false;
+						hitTestSource = null;
+
+					});
+
+					hitTestSourceRequested = true;
+
+				}
+
+				if (hitTestSource) {
+
+					const hitTestResults = frame.getHitTestResults(hitTestSource);
+
+					if (hitTestResults.length) {
+
+						const hit = hitTestResults[0];
+
+						reticle.visible = true;
+						reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
+
+					} else {
+
+						reticle.visible = false;
+
+					}
+
+				}
+
+			}
+
+			renderer.render(scene, camera);
+
+		}
+
+	</script>
+</body>
+
+</html>
